@@ -1,0 +1,1 @@
+export function GET() { return new Response('Contact: mailto:avrxt.dev@elvnx.tech\nExpires: 2027-10-24T00:00:00.000Z\nPreferred-Languages: en\nCanonical: https://muzix.avrxt.dev/.well-known/security.txt\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } }); }
