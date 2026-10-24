@@ -5,6 +5,54 @@ import { ArrowUpRight, Disc3, Heart, History, ListMusic, LoaderCircle, Pause, Pl
 import { SiSpotify } from 'react-icons/si';
 import type { ChartArtist, ChartTrack, MuzixChart } from '@/lib/spotify-chart';
 import { apiUrl } from '@/lib/api-gateway';
+import { createRealtimeClient } from '@/lib/supabase';
+
+type PlaybackSignal = {
+  isPlaying?: boolean;
+  is_playing?: boolean;
+  title?: string | null;
+  artist?: string | null;
+  album?: string | null;
+  albumImageUrl?: string | null;
+  album_image_url?: string | null;
+  songUrl?: string | null;
+  song_url?: string | null;
+  progressMs?: number | null;
+  progress_ms?: number | null;
+  durationMs?: number | null;
+  duration_ms?: number | null;
+  fetchedAt?: number;
+  updated_at?: string;
+};
+
+const LIVE_SYNC_INTERVAL_MS = 5_000;
+
+function liveTrack(signal: PlaybackSignal, current: MuzixChart['nowPlaying']): MuzixChart['nowPlaying'] {
+  const title = signal.title || current?.title;
+  const artist = signal.artist || current?.artist;
+  const image = signal.albumImageUrl || signal.album_image_url || current?.image;
+  const url = signal.songUrl || signal.song_url || current?.url;
+  const progress = signal.progressMs ?? signal.progress_ms ?? current?.progressMs ?? 0;
+  const duration = signal.durationMs ?? signal.duration_ms ?? current?.durationMs ?? 0;
+  const isPlaying = signal.isPlaying ?? signal.is_playing ?? false;
+
+  if (!title && !current) return null;
+  return {
+    id: current?.id || `${title || 'spotify'}-${artist || 'signal'}`,
+    title: title || 'No active track',
+    artist: artist || 'Spotify is currently quiet',
+    album: signal.album || current?.album || 'Spotify playback',
+    image: image || '',
+    url: url || '',
+    durationMs: duration,
+    progressMs: progress,
+    isPlaying,
+    repeatState: current?.repeatState || 'off',
+    shuffle: current?.shuffle || false,
+    contextUrl: current?.contextUrl || '',
+    contextName: current?.contextName || 'No active playlist',
+  };
+}
 
 function Art({ image, label, className = '' }: { image?: string; label: string; className?: string }) {
   return (
@@ -78,6 +126,60 @@ export default function MuzixChartClient() {
     }, 2 * 60_000);
     const ticker = window.setInterval(() => setClock(Date.now()), 1_000);
     return () => { window.clearInterval(refresh); window.clearInterval(ticker); };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+    let controller: AbortController | undefined;
+    const realtime = createRealtimeClient();
+
+    const applySignal = (signal: PlaybackSignal) => {
+      if (!active) return;
+      setData((current) => current ? {
+        ...current,
+        generatedAt: signal.fetchedAt || (signal.updated_at ? new Date(signal.updated_at).getTime() : Date.now()),
+        nowPlaying: liveTrack(signal, current.nowPlaying),
+      } : current);
+    };
+
+    // This endpoint refreshes Spotify and publishes a changed row. It is also a
+    // deliberately short fallback for browsers where a websocket is blocked.
+    const sync = async () => {
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const response = await fetch(apiUrl('/v1/spotify/now-playing'), {
+          cache: 'no-store', signal: controller.signal, headers: { Accept: 'application/json' },
+        });
+        if (response.ok) applySignal(await response.json() as PlaybackSignal);
+      } catch (cause) {
+        if (!(cause instanceof DOMException && cause.name === 'AbortError')) console.warn('Live Spotify sync unavailable', cause);
+      } finally {
+        if (active) timer = window.setTimeout(() => void sync(), LIVE_SYNC_INTERVAL_MS);
+      }
+    };
+
+    const channel = realtime
+      ?.channel('avrxt_muzix_spotify_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'spotify_status' }, (event) => {
+        applySignal(event.new as PlaybackSignal);
+      })
+      .subscribe();
+
+    void sync();
+    const resume = () => { if (document.visibilityState === 'visible') void sync(); };
+    window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
+
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+      controller?.abort();
+      if (channel && realtime) void realtime.removeChannel(channel);
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
   }, []);
 
   const progress = useMemo(() => {
