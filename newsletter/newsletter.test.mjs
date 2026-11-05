@@ -4,6 +4,7 @@ import {monthWindow,summarizeScrobbles,fetchSnapshot} from './snapshot.mjs';
 import {confirmationEmail,welcomeEmail,monthlyEmail} from './email.mjs';
 import {publishSnapshot} from './monthly.mjs';
 import {handleNewsletter,newsletterToken,readNewsletterToken} from '../worker/newsletter.mjs';
+import {enrichSnapshot,listeningTime,validImage} from './enrich.mjs';
 const now=Date.parse('2026-11-05T12:00:00Z');
 const window=monthWindow(undefined,now);
 const entry=(artist,title,uts=window.from)=>({artist:{'#text':artist},name:title,album:{'#text':'Album'},url:'https://www.last.fm/music/a/b',date:{uts:String(uts)}});
@@ -57,4 +58,27 @@ test('monthly reruns reuse a draft and skip already-sent editions',async()=>{
   const result=await publishSnapshot({snapshot,key:'test',segment:'muzix',mode:'send',fetcher});
   assert.equal(result.status,'sent');assert.deepEqual(calls.map(c=>c.method),['GET','PATCH','POST']);
   state='sent';calls.length=0;assert.equal((await publishSnapshot({snapshot,key:'test',segment:'muzix',mode:'send',fetcher})).status,'already-sent');assert.equal(calls.length,1);
+});
+test('duration coverage counts repeated scrobbles, excludes unknown lengths and rejects unsafe art',()=>{
+  const time=listeningTime([{plays:3,durationMs:180000},{plays:2,durationMs:0},{plays:1,durationMs:120000}],6);
+  assert.equal(time.milliseconds,660000);assert.equal(time.coveredPlays,4);assert.equal(time.complete,false);
+  assert.equal(validImage('https://evil.example/cover.jpg'),'');assert.equal(validImage('javascript:alert(1)'),'');
+  assert.equal(validImage('https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png'),'');
+  const email=monthlyEmail({...snapshot,scrobbles:6,playtime:time,onLoop:snapshot.tracks[0]});assert.match(email.html,/KNOWN PLAYTIME/);assert.match(email.html,/4 of 6 scrobbles/);assert.match(email.html,/not measured listening time/);
+});
+test('metadata enrichment verifies performer and keeps edition usable during optional metadata failures',async()=>{
+  const input=summarizeScrobbles([entry('Artist One','Song'),entry('Artist One','Song'),entry('Artist Two','Other')],window,3);
+  const output=await enrichSnapshot(input,{key:'test',pause:async()=>{},fetcher:async(value)=>{
+    const url=new URL(value);
+    if(url.hostname==='ws.audioscrobbler.com')return Response.json({track:{name:url.searchParams.get('track'),artist:{name:url.searchParams.get('artist')==='Artist One'?'Artist One':'Wrong Performer'},duration:'180000',album:{image:[{'#text':'https://lastfm.freetls.fastly.net/i/u/300x300/abc.jpg'}]}}});
+    return Response.json({image:'',results:[]});
+  }});
+  assert.equal(output.playtime.milliseconds,360000);assert.equal(output.playtime.coveredPlays,2);assert.equal(output.onLoop.plays,2);assert.match(output.tracks[0].image,/abc.jpg/);assert.equal(output.trackCatalog,undefined);
+});
+test('month-so-far previews cannot become broadcasts and extended template includes branding and art',async()=>{
+  const current=monthWindow('2026-11',now,true);assert.equal(current.partial,true);
+  await assert.rejects(publishSnapshot({snapshot:{...snapshot,partial:true},key:'test',segment:'muzix',mode:'send'}),/cannot/);
+  const image='https://lastfm.freetls.fastly.net/i/u/300x300/abc.jpg';
+  const email=monthlyEmail({...snapshot,onLoop:{...snapshot.tracks[0],image},tracks:[{...snapshot.tracks[0],image}]});
+  assert.match(email.html,/01 \/ ON LOOP/);assert.match(email.html,/TRACKS ON REPEAT/);assert.match(email.html,/avrxt-nexus-ligature.png/);assert.match(email.html,/avrxt-pure-white.png/);assert.match(email.html,/<img src="https:\/\/lastfm/);assert.ok(Buffer.byteLength(email.html)<95000);
 });

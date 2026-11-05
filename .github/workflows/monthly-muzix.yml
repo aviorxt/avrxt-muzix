@@ -11,7 +11,7 @@ on:
         options: [preview, draft, send]
         default: preview
       month:
-        description: Completed month YYYY-MM; leave empty for previous calendar month
+        description: Month YYYY-MM; current month allowed in preview only; empty means previous month
         type: string
         required: false
 permissions:

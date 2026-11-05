@@ -10,10 +10,14 @@
     "test": "node --test worker/lastfm.test.mjs worker/cache-policy.test.mjs worker/artwork.test.mjs newsletter/newsletter.test.mjs"
   },
   "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
     "next": "15.5.29",
+    "radix-ui": "^1.8.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",

@@ -2,7 +2,9 @@ import { mkdir,writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { fetchSnapshot } from './snapshot.mjs';
 import { monthlyEmail } from './email.mjs';
+import { enrichSnapshot } from './enrich.mjs';
 export async function publishSnapshot({snapshot,key,segment,mode='draft',fetcher=fetch}){
+  if(snapshot.partial)throw new Error('A month-so-far preview cannot be published or sent.');
   if(!key||!segment)throw new Error('Resend credentials and Muzix segment are required.');
   if(!['draft','send'].includes(mode))throw new Error('Invalid publishing mode.');
   let nextRequest=0;
@@ -36,7 +38,8 @@ export async function publishSnapshot({snapshot,key,segment,mode='draft',fetcher
 async function main(){
   const mode=process.env.NEWSLETTER_MODE||'preview';
   if(!['preview','draft','send'].includes(mode))throw new Error('Use preview, draft, or send mode.');
-  const snapshot=await fetchSnapshot({key:process.env.LASTFM_API_KEY,username:process.env.LASTFM_USERNAME||'avrxt',month:process.env.NEWSLETTER_MONTH||undefined});
+  const raw=await fetchSnapshot({key:process.env.LASTFM_API_KEY,username:process.env.LASTFM_USERNAME||'avrxt',month:process.env.NEWSLETTER_MONTH||undefined,allowCurrent:mode==='preview'});
+  const snapshot=await enrichSnapshot(raw,{key:process.env.LASTFM_API_KEY});
   const email=monthlyEmail(snapshot);await mkdir('newsletter-output',{recursive:true});
   await Promise.all([writeFile('newsletter-output/snapshot.json',JSON.stringify(snapshot,null,2)),writeFile('newsletter-output/email.html',email.html),writeFile('newsletter-output/email.txt',email.text)]);
   const result=mode==='preview'?{status:'preview'}:await publishSnapshot({snapshot,key:process.env.MUZIX_RESEND_API_KEY,segment:process.env.MUZIX_SEGMENT_ID,mode});
