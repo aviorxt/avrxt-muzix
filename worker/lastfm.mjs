@@ -82,6 +82,8 @@ async function handleMuzix(request, env) {
   const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
   if (request.method !== 'GET') return Response.json({ error: 'Method not allowed' }, { status: 405, headers: { ...headers, Allow: 'GET' } });
   if (!env.LASTFM_API_KEY) return Response.json({ error: 'Listening feed is not configured.' }, { status: 503, headers });
+  if (new URL(request.url).pathname === '/v1/music/artwork') return musicArtwork(request, env);
+  if (new URL(request.url).pathname === '/v1/music/artist-image') return musicArtistImage(request, env);
   const recent = await musicCached(env, 'recent', 20000, async () => {
     const data = await musicApi(env, 'user.getRecentTracks', { limit: '50' });
     if (!data.recenttracks) throw new Error('invalid_recenttracks');
@@ -117,4 +119,79 @@ async function handleMuzix(request, env) {
   }, { headers });
 }
 
-export { handleMuzix, musicMonth };
+function musicNormalize(value, isTitle = false) {
+  const text = isTitle ? String(value || '').replace(/\s*(?:[-�]\s*)?\(?from\s+.*$/i, '') : String(value || '');
+  return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+}
+function musicMatch(item, artist, title, album = false) {
+  const name = album ? item.collectionName?.replace(/\s*[-–]\s*(single|ep)$/i, '') : item.trackName;
+  const requested = album ? title.replace(/\s*[-–]\s*(single|ep)$/i, '') : title;
+  const performer = musicNormalize(item.artistName);
+  const wanted = musicNormalize(artist);
+  return wanted.length >= 3 && performer.includes(wanted) && musicNormalize(name, true) === musicNormalize(requested, true);
+}
+async function musicArtwork(request, env) {
+  const params = new URL(request.url).searchParams;
+  const artist = params.get('artist')?.trim() || '';
+  const title = params.get('track')?.trim() || '';
+  const album = params.get('album')?.trim() || '';
+  const albumOnly = params.get('type') === 'album';
+  if (!artist || (!title && !album) || artist.length > 200 || title.length > 300 || album.length > 300) {
+    return Response.json({ error: 'Invalid artwork query' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+  }
+  const key = 'artwork-v4-' + encodeURIComponent(JSON.stringify([artist.toLowerCase(), albumOnly ? album.toLowerCase() : title.toLowerCase(), albumOnly]));
+  const entry = await musicCached(env, key, 86400000, async () => {
+    // Last.fm's recent/top lists often omit artwork that its detail API has.
+    try {
+      const data = albumOnly
+        ? await musicApi(env, 'album.getInfo', { artist, album, autocorrect: '0' })
+        : await musicApi(env, 'track.getInfo', { artist, track: title, autocorrect: '0' });
+      const detail = albumOnly ? data.album : data.track?.album;
+      const image = musicImage(detail?.image);
+      if (image) return { image, source: 'lastfm', sourceUrl: musicUrl(detail.url || data.track?.url) };
+    } catch { /* Try a verified catalogue match instead. */ }
+    const search = new URL('https://itunes.apple.com/search');
+    search.search = new URLSearchParams({ term: artist + ' ' + (albumOnly ? album : title), media: 'music', entity: albumOnly ? 'album' : 'song', country: 'IN', limit: '10' }).toString();
+    try {
+      const response = await fetch(search, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) });
+      if (!response.ok) return { image: '', source: null, sourceUrl: '', clientLookup: true };
+      const data = await response.json();
+      const match = musicArray(data.results).find(item => musicMatch(item, artist, albumOnly ? album : title, albumOnly));
+      if (match) {
+        const image = musicUrl(match.artworkUrl100);
+        const link = musicUrl(albumOnly ? match.collectionViewUrl : match.trackViewUrl);
+        if (image && new URL(image).hostname.endsWith('.mzstatic.com') && link && /(^|\.)apple\.com$/.test(new URL(link).hostname)) {
+          return { image: image.replace(/\/100x100bb\./, '/600x600bb.'), source: 'apple', sourceUrl: link };
+        }
+      }
+    } catch { return { image: '', source: null, sourceUrl: '', clientLookup: true }; }
+    return { image: '', source: null, sourceUrl: '' };
+  });
+  return Response.json(entry.value || { image: '', source: null, sourceUrl: '' }, { headers: { 'Cache-Control': 'private, no-store' } });
+}
+async function musicArtistImage(request, env) {
+  const artist = new URL(request.url).searchParams.get('artist')?.trim() || '';
+  if (!artist || artist.length > 200) return Response.json({ error: 'Invalid artist' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+  const entry = await musicCached(env, 'artist-deezer-v1-' + encodeURIComponent(musicNormalize(artist)), 86400000, async () => {
+    const url = new URL('https://api.deezer.com/search/artist');
+    url.search = new URLSearchParams({ q: artist, limit: '10' }).toString();
+    const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(6000) });
+    if (!response.ok) throw new Error('artist_catalogue_unavailable');
+    const data = await response.json();
+    if (data.error) throw new Error('artist_catalogue_unavailable');
+    const candidates = musicArray(data.data).filter(item => musicNormalize(item.name) === musicNormalize(artist))
+      .sort((a,b) => musicNumber(b.nb_fan) - musicNumber(a.nb_fan));
+    for (const match of candidates) {
+      const image = musicUrl(match.picture_big || match.picture_medium);
+      const link = musicUrl(match.link);
+      if (image && new URL(image).hostname === 'cdn-images.dzcdn.net' && /\/images\/artist\/[a-f0-9]{32}\//.test(new URL(image).pathname)
+        && link && /(^|\.)deezer\.com$/.test(new URL(link).hostname)) {
+        return { image, source: 'deezer', sourceUrl: link };
+      }
+    }
+    return { image: '', source: null, sourceUrl: '' };
+  });
+  return Response.json(entry.value || { image: '', source: null, sourceUrl: '' }, { headers: { 'Cache-Control': 'private, no-store' } });
+}
+export { handleMuzix, musicMonth, musicMatch };

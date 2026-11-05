@@ -7,10 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test worker/lastfm.test.mjs worker/cache-policy.test.mjs"
+    "test": "node --test worker/lastfm.test.mjs worker/cache-policy.test.mjs worker/artwork.test.mjs"
   },
   "dependencies": {
-    "geist": "^1.8.1",
     "lucide-react": "^0.562.0",
     "next": "15.5.29",
     "react": "19.2.3",

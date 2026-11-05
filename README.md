@@ -4,6 +4,14 @@ Personal Last.fm listening journal for [muzix.avrxt.dev](https://muzix.avrxt.dev
 
 It consumes `https://api.avrxt.dev/v1/music/chart` from the existing Cloudflare Worker. Last.fm credentials stay in Cloudflare. No Spotify Premium developer application or Supabase browser connection is required by Muzix.
 
+The visual language matches the main AVRXT site: monochrome surfaces, outlined Outfit headings, Inter body text, Space Mono labels, fine borders and restrained grids. Home/Profile navigation connects the three sites.
+
+## Artwork
+
+Song/album covers use Last.fm detail metadata, then verified Apple catalogue matches. Names are checked against both artist and title; alternate versions and unrelated search results are rejected. Apple Music links accompany its artwork. If Apple's shared datacentre endpoint is rate-limited, the browser can query its public CORS API without credentials. Those requests are paced below approximately 20/minute, deduplicated, and successful artwork is cached locally for 24 hours. A first visit can therefore fill missing covers gradually.
+
+Artist images come from exact-name Deezer artist records through `/v1/music/artist-image`, cached in the Worker for 24 hours. Album artwork is not used as a substitute for an artist record. Source links accompany portraits. Missing/unverified images retain a neutral placeholder; a broken image URL also triggers lookup.
+
 ## Local development
 
 ```bash

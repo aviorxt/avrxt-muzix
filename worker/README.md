@@ -4,13 +4,13 @@
 
 Cloudflare production secret: `LASTFM_API_KEY`. Optional variable: `LASTFM_USERNAME` (defaults to `avrxt`). The API secret and Last.fm write-auth session are unnecessary for public read endpoints.
 
-Import `handleMuzix` and route only `/v1/music/chart` and `/v1/music/now-playing` to it. Keep the gateway's CORS wrapper and rate limiting, and honour the existing public-profile enabled flag:
+Import `handleMuzix` and route the four `/v1/music/` endpoints (chart, now-playing, artwork and artist-image) to it. Keep the gateway's CORS wrapper and rate limiting, and honour the existing public-profile enabled flag:
 
 ```js
 import { handleMuzix } from './lastfm.mjs';
 
 // Inside the existing fetch handler, after OPTIONS and rate-limit handling:
-if (url.pathname === '/v1/music/chart' || url.pathname === '/v1/music/now-playing') {
+if (['/v1/music/chart', '/v1/music/now-playing', '/v1/music/artwork', '/v1/music/artist-image'].includes(url.pathname)) {
   const profile = await getPublicConfig(env);
   if (profile?.site?.profileEnabled === false) {
     return json(request, { error: 'PROFILE_DISABLED' }, 404, { 'Cache-Control': 'no-store' });
@@ -39,7 +39,7 @@ export default {
 
 Only successful public reads of the root, public status, weather and link previews are eligible. Explicit upstream private/no-store directives remain respected. All other paths, errors, write requests, cookie-bearing requests, Authorization-bearing requests and Set-Cookie responses receive `private, no-store`. CORS/cache variants include Origin, Cookie and Authorization. WebSocket response objects remain untouched.
 
-Spotify playback, Discord presence, health, profile config and both music endpoints bypass the outer Workers Cache. The music endpoints still share the internal Last.fm cache. This prevents cache hits from bypassing per-request checks on private or live endpoints.
+Spotify playback, Discord presence, health, profile config and all music endpoints bypass the outer Workers Cache. The music endpoints still share the internal Last.fm cache. This prevents cache hits from bypassing per-request checks on private or live endpoints.
 
 The dependent `avrxt-me` site still consumes the existing Spotify playback shape and Supabase realtime. Its migration is separate; never silently return the new music contract from a Spotify route. The main website's newsletter/contact/mail operations are not cacheable. Keep the production gateway snapshot in sync with its private source repository before a later deployment from that repository.
 

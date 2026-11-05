@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import { GeistMono, GeistSans } from 'geist/font';
+import { Inter, Space_Mono, Outfit } from 'next/font/google';
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const mono = Space_Mono({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-mono' });
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 import './globals.css';
 
 const favicon = '/brand/avrxt-selected/favicon.ico';
@@ -13,5 +16,5 @@ export const metadata: Metadata = {
   openGraph: { type: 'website', url: '/', siteName: 'AVRXT Muzix', title: 'Muzix Chart — AVRXT', description: 'The current AVRXT listening signal: now playing, recent scrobbles and listening charts.' },
   twitter: { card: 'summary', title: 'Muzix Chart — AVRXT', description: 'AVRXT Last.fm listening telemetry.' },
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#111710', colorScheme: 'dark' };
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en" className="dark"><body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>{children}</body></html>; }
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#050505', colorScheme: 'dark' };
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en" className="dark"><body className={`${inter.variable} ${mono.variable} ${outfit.variable} antialiased`}>{children}</body></html>; }
