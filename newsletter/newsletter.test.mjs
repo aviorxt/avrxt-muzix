@@ -82,3 +82,12 @@ test('month-so-far previews cannot become broadcasts and extended template inclu
   const email=monthlyEmail({...snapshot,onLoop:{...snapshot.tracks[0],image},tracks:[{...snapshot.tracks[0],image}]});
   assert.match(email.html,/01 \/ ON LOOP/);assert.match(email.html,/TRACKS ON REPEAT/);assert.match(email.html,/avrxt-nexus-ligature.png/);assert.match(email.html,/avrxt-pure-white.png/);assert.match(email.html,/<img src="https:\/\/lastfm/);assert.ok(Buffer.byteLength(email.html)<95000);
 });
+test('an explicitly requested special edition has a separate identity from the full-month edition',async()=>{
+  const special={...snapshot,partial:true,issueDate:'2026-11-05',month:'2026-11'};
+  let created;const methods=[];
+  const fetcher=async(url,options)=>{methods.push(options.method);if(options.method==='GET')return Response.json({data:[],has_more:false});if(url.endsWith('/broadcasts'))created=JSON.parse(options.body);return Response.json({id:'special'});};
+  assert.equal((await publishSnapshot({snapshot:special,key:'test',segment:'muzix',mode:'send-current',fetcher})).status,'sent');
+  assert.equal(created.name,'muzix-special-2026-11-05');assert.deepEqual(methods,['GET','POST','POST']);
+  assert.match(created.html,/SPECIAL EDITION/);assert.doesNotMatch(created.html,/DESIGN PREVIEW/);
+  await assert.rejects(publishSnapshot({snapshot,key:'test',segment:'muzix',mode:'send-current',fetcher}),/requires/);
+});
