@@ -1,5 +1,6 @@
 'use client';
 import Subscribe from '@/components/Subscribe';
+import Link from 'next/link';
 import MotionEffects from '@/components/MotionEffects';
 import { Button } from '@/components/ui/button';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -80,7 +81,7 @@ export default function MuzixChartClient() {
       {month?.onLoop && <aside className="on-loop"><span className="eyebrow">ONE MORE TIME ↻</span><p>Apparently, I’m not done with <a href={month.onLoop.url || undefined} target="_blank" rel="noreferrer">{month.onLoop.title} <ArrowUpRight size={22} /></a></p><span>{number(month.onLoop.plays)} scrobbles {month.complete ? 'this month' : 'in fetched monthly history'}. And counting.</span></aside>}
       <section className="albums-section" aria-labelledby="albums-heading"><div className="section-line"><h2 id="albums-heading">05 / ON THE SHELF</h2><span>ALBUMS · LAST 30 DAYS</span></div><div className="album-grid">{data?.topAlbums.map(album => <article key={`${album.artist}-${album.name}`}><Cover image={album.image} title={album.name} artist={album.artist} album={album.name} albumOnly /><a href={album.url || undefined} target="_blank" rel="noreferrer"><h3>{album.name}</h3></a><p>{album.artist}</p><span>{number(album.plays)} plays</span></article>)}</div></section>
       <Subscribe />
-      <footer className="music-footer"><div><a className="wordmark" href="https://www.avrxt.dev">AVRXT / MUZIX</a><p>A personal archive. Always in progress.</p></div><div><a href={data?.profileUrl || 'https://www.last.fm/user/avrxt'} target="_blank" rel="noreferrer">POWERED BY LAST.FM <ArrowUpRight size={12} /></a><p>{data?.totalScrobbles != null ? `${number(data.totalScrobbles)} lifetime scrobbles` : 'Listening history & charts'}{data && <> · Checked <time dateTime={new Date(data.checkedAt).toISOString()}>{new Date(data.checkedAt).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}</time></>}</p></div></footer>
+      <footer className="music-footer"><div><a className="wordmark" href="https://www.avrxt.dev">AVRXT / MUZIX</a><p>A personal archive. Always in progress.</p><nav className="legal-links" aria-label="Legal information"><Link href="/privacy">PRIVACY</Link><Link href="/terms">TERMS</Link><a href="mailto:support@avrxt.dev">SUPPORT ↗</a></nav></div><div><a href={data?.profileUrl || 'https://www.last.fm/user/avrxt'} target="_blank" rel="noreferrer">POWERED BY LAST.FM <ArrowUpRight size={12} /></a><p>{data?.totalScrobbles != null ? `${number(data.totalScrobbles)} lifetime scrobbles` : 'Listening history & charts'}{data && <> · Checked <time dateTime={new Date(data.checkedAt).toISOString()}>{new Date(data.checkedAt).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}</time></>}</p></div></footer>
     </div>
   </main>;
 }
