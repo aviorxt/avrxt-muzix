@@ -72,5 +72,6 @@ export function resolveArtwork(endpoint: string): Promise<Artwork> {
   });
   if (pending.size > 500) pending.clear();
   pending.set(cacheKey, result);
+  void result.then(value => { if (!value.image) pending.delete(cacheKey); });
   return result;
 }

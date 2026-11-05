@@ -11,8 +11,16 @@ export default function ArtistPortrait({ name, image, rank }: { name: string; im
   useEffect(() => {
     if (image && failed !== image) return;
     let active = true;
-    void resolveArtwork(apiUrl('/v1/music/artist-image?' + new URLSearchParams({ artist: name }))).then(value => { if (active) setResult({ name, value }); });
-    return () => { active = false; };
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const endpoint = apiUrl('/v1/music/artist-image?' + new URLSearchParams({ artist: name }));
+    const load = async (again = true) => {
+      const value = await resolveArtwork(endpoint);
+      if (!active) return;
+      setResult({ name, value });
+      if (!value.image && again) retry = setTimeout(() => { void load(false); }, 35000);
+    };
+    void load();
+    return () => { active = false; clearTimeout(retry); };
   }, [name, image, failed]);
   return <div className="artist-portrait">
     {url && failed !== url ?
