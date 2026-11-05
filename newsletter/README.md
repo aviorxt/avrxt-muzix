@@ -25,3 +25,13 @@ The private `avrxt.dev/api-worker` contains the deployed gateway wrapper and mir
 Leave `month` empty for the previous completed calendar month, or specify `YYYY-MM`. Current and future months are rejected. The script retrieves all completed Last.fm scrobbles for the India calendar month (up to 100,000), preserving repeated plays and excluding live entries. Missing pages, inconsistent totals, or upstream errors stop delivery; partial counts are never presented as complete.
 
 Each edition is named `muzix-monthly-YYYY-MM`. Workflow concurrency serializes runs. A rerun reuses an existing draft and skips already sent/scheduled/sending editions; it never automatically retries an ambiguous write. Inspect Resend before retrying after a network failure. The uploaded artifact contains only public listening data and email content, with no recipient list. Run `npm test`, `npm run lint`, and `npm run build` for validation.
+
+## Extended edition
+
+The scheduled edition now includes song/album covers, a featured on-loop song, five artist portraits, ten ranked tracks, three albums, active days, busiest day and a weekday listening chart. Artwork uses verified Last.fm / Apple catalogue matches; artist images use Deezer. Missing images retain neutral text placeholders and external artwork links include source credits.
+
+Playtime is an explicit full-track estimate: known track duration × completed scrobbles. The email reports known-play coverage and never invents a duration for unmatched songs. Duration lookup has a four-minute / 500-track budget, so a large or incomplete catalogue still produces honest partial coverage rather than a false total.
+
+Manual preview mode also accepts the current month, labels it “month so far,” and cannot publish it to Resend. Draft/send modes require a completed month. The Nexus logo is an identical copy of the supplied asset, served from `/brand/mail/` with cross-origin image permission for email clients; the supplied white AVRXT banner is used on the dark header. Confirmation and welcome mail share the same branding.
+
+The site uses shadcn Button, Input, Checkbox, Card and Badge components, styled with AVRXT tokens. Confirmation links survive reload until completion; mobile controls have at least 44px touch targets. CSS transitions and scroll reveals respect reduced-motion preferences.
