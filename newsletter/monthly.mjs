@@ -43,4 +43,4 @@ async function main(){
   console.log(JSON.stringify({month:snapshot.month,scrobbles:snapshot.scrobbles,...result}));
   if(process.env.GITHUB_STEP_SUMMARY)await writeFile(process.env.GITHUB_STEP_SUMMARY,`Muzix ${snapshot.month}: ${result.status}. ${snapshot.scrobbles} completed scrobbles; ${snapshot.uniqueArtists} artists.\n`,{flag:'a'});
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(()=>{console.error('Monthly snapshot failed. No automatic write retry was attempted; inspect the run and Resend before rerunning.');process.exitCode=1;});
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{console.error(error.message);console.error('Monthly snapshot failed. No automatic write retry was attempted; inspect the run and Resend before rerunning.');process.exitCode=1;});
