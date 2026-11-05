@@ -8,7 +8,7 @@ on:
       mode:
         description: Preview artifact, Resend draft, or send to confirmed Muzix subscribers
         type: choice
-        options: [preview, draft, send]
+        options: [preview, draft, send, send-current]
         default: preview
       month:
         description: Month YYYY-MM; current month allowed in preview only; empty means previous month

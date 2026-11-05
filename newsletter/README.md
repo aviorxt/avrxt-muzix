@@ -35,3 +35,5 @@ Playtime is an explicit full-track estimate: known track duration × completed s
 Manual preview mode also accepts the current month, labels it “month so far,” and cannot publish it to Resend. Draft/send modes require a completed month. The Nexus logo is an identical copy of the supplied asset, served from `/brand/mail/` with cross-origin image permission for email clients; the supplied white AVRXT banner is used on the dark header. Confirmation and welcome mail share the same branding.
 
 The site uses shadcn Button, Input, Checkbox, Card and Badge components, styled with AVRXT tokens. Confirmation links survive reload until completion; mobile controls have at least 44px touch targets. CSS transitions and scroll reveals respect reduced-motion preferences.
+
+Manual send-current mode sends an explicitly labelled month-so-far special edition. It uses a separate muzix-special-YYYY-MM-DD identity so a same-day rerun cannot duplicate the send or suppress the normal complete-month edition. Scheduled runs still use completed-month send mode.

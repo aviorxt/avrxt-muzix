@@ -4,9 +4,11 @@ import { fetchSnapshot } from './snapshot.mjs';
 import { monthlyEmail } from './email.mjs';
 import { enrichSnapshot } from './enrich.mjs';
 export async function publishSnapshot({snapshot,key,segment,mode='draft',fetcher=fetch}){
-  if(snapshot.partial)throw new Error('A month-so-far preview cannot be published or sent.');
+  const special=mode==='send-current';
+  if(snapshot.partial&&!special)throw new Error('A month-so-far preview cannot be published or sent.');
+  if(special&&(!snapshot.partial||!/^20\d{2}-\d{2}-\d{2}$/.test(snapshot.issueDate||'')))throw new Error('A manual current-month edition requires an issue date and month-so-far snapshot.');
   if(!key||!segment)throw new Error('Resend credentials and Muzix segment are required.');
-  if(!['draft','send'].includes(mode))throw new Error('Invalid publishing mode.');
+  if(!['draft','send','send-current'].includes(mode))throw new Error('Invalid publishing mode.');
   let nextRequest=0;
   async function api(path,method='GET',body){
     // Stay below the account API limit. Only read requests are retried here;
@@ -18,7 +20,7 @@ export async function publishSnapshot({snapshot,key,segment,mode='draft',fetcher
       const data=await response.json();if(!response.ok)throw new Error(`Resend ${method} failed (${response.status}); inspect the broadcast before rerunning.`);return data;
     }
   }
-  const name='muzix-monthly-'+snapshot.month;
+  const name=special?'muzix-special-'+snapshot.issueDate:'muzix-monthly-'+snapshot.month;
   let after='',matches=[];
   do{const page=await api('/broadcasts?limit=100'+(after?'&after='+encodeURIComponent(after):''));if(!Array.isArray(page.data))throw new Error('Could not inspect existing broadcasts.');matches.push(...page.data.filter(x=>x.name===name));after=page.has_more?page.data.at(-1)?.id:'';if(page.has_more&&!after)throw new Error('Invalid broadcast pagination.');}while(after);
   if(matches.length>1)throw new Error('Duplicate edition names exist. Resolve them in Resend before sending.');
@@ -32,13 +34,16 @@ export async function publishSnapshot({snapshot,key,segment,mode='draft',fetcher
   const body={segment_id:segment,from:'Muzix <notes@muzix.avrxt.dev>',name,...email};
   if(!broadcast){const created=await api('/broadcasts','POST',body);if(!created.id)throw new Error('Resend returned no broadcast ID.');broadcast={id:created.id,status:'draft'};}
   else await api('/broadcasts/'+broadcast.id,'PATCH',body);
-  if(mode==='send')await api('/broadcasts/'+broadcast.id+'/send','POST',{});
-  return {status:mode==='send'?'sent':'draft',id:broadcast.id};
+  if(mode==='send'||special)await api('/broadcasts/'+broadcast.id+'/send','POST',{});
+  return {status:mode==='send'||special?'sent':'draft',id:broadcast.id};
 }
 async function main(){
   const mode=process.env.NEWSLETTER_MODE||'preview';
-  if(!['preview','draft','send'].includes(mode))throw new Error('Use preview, draft, or send mode.');
-  const raw=await fetchSnapshot({key:process.env.LASTFM_API_KEY,username:process.env.LASTFM_USERNAME||'avrxt',month:process.env.NEWSLETTER_MONTH||undefined,allowCurrent:mode==='preview'});
+  if(!['preview','draft','send','send-current'].includes(mode))throw new Error('Use preview, draft, send, or send-current mode.');
+  const issueDate=new Date(Date.now()+19800000).toISOString().slice(0,10);
+  const month=process.env.NEWSLETTER_MONTH||(mode==='send-current'?issueDate.slice(0,7):undefined);
+  const raw=await fetchSnapshot({key:process.env.LASTFM_API_KEY,username:process.env.LASTFM_USERNAME||'avrxt',month,allowCurrent:mode==='preview'||mode==='send-current'});
+  if(mode==='send-current')raw.issueDate=issueDate;
   const snapshot=await enrichSnapshot(raw,{key:process.env.LASTFM_API_KEY});
   const email=monthlyEmail(snapshot);await mkdir('newsletter-output',{recursive:true});
   await Promise.all([writeFile('newsletter-output/snapshot.json',JSON.stringify(snapshot,null,2)),writeFile('newsletter-output/email.html',email.html),writeFile('newsletter-output/email.txt',email.text)]);
