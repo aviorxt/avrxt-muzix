@@ -2,3 +2,8 @@ node_modules
 .next
 .env*
 !.env.example
+*.tsbuildinfo
+
+worker/gateway-*.mjs
+worker/review-server.mjs
+worker/live-chart.json
