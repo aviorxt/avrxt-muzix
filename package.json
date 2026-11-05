@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test worker/lastfm.test.mjs worker/cache-policy.test.mjs worker/artwork.test.mjs"
+    "test": "node --test worker/lastfm.test.mjs worker/cache-policy.test.mjs worker/artwork.test.mjs newsletter/newsletter.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.562.0",

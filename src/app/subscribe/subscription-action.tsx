@@ -1,0 +1,10 @@
+'use client';
+import { useEffect,useState } from 'react';
+import Link from 'next/link';
+import { apiUrl } from '@/lib/api-gateway';
+export default function SubscriptionAction(){
+  const [token,setToken]=useState(''),[unsubscribe,setUnsubscribe]=useState(false),[busy,setBusy]=useState(false),[done,setDone]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(false);
+  useEffect(()=>{const params=new URLSearchParams(window.location.hash.slice(1));setUnsubscribe(params.has('unsubscribe'));setToken(params.get('token')||params.get('unsubscribe')||'');window.history.replaceState(null,'','/subscribe');},[]);
+  async function act(){if(!token||busy)return;setBusy(true);setError(false);try{const response=await fetch(apiUrl('/v1/music/'+(unsubscribe?'unsubscribe':'confirm')),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token}),signal:AbortSignal.timeout(30000)});const result=await response.json();if(!response.ok)throw new Error(result.error);setDone(true);setMessage(result.message);}catch(cause){setError(true);setMessage(cause instanceof Error?cause.message:'Please try again.');}finally{setBusy(false);}}
+  return <main className="music-page"><div className="page-shell subscription-action"><Link className="wordmark" href="/">AVRXT / MUZIX</Link><span className="eyebrow">THE MONTHLY FREQUENCY</span><h1>{done?(unsubscribe?'You’re off the list.':'You’re in the rotation.'):(unsubscribe?'Leave the rotation?':'One more step.')}</h1><p>{done?message:unsubscribe?'Unsubscribe from the Muzix monthly snapshot.':'Confirm your email to receive the monthly Muzix listening snapshot.'}</p>{!done&&token&&<button className="subscription-button" onClick={act} disabled={busy}>{busy?'PLEASE WAIT…':unsubscribe?'UNSUBSCRIBE':'CONFIRM SUBSCRIPTION'}</button>}{!done&&!token&&<p>Open the link in your email, or <Link href="/#subscribe">request a fresh confirmation</Link>.</p>}{error&&<p role="alert" className="feed-error">{message}</p>}<p className="newsletter-signature">with 🩶 @avrxt</p><Link className="text-link" href="/">BACK TO MUZIX ↗</Link></div></main>;
+}

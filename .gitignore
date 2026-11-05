@@ -7,3 +7,5 @@ node_modules
 worker/gateway-*.mjs
 worker/review-server.mjs
 worker/live-chart.json
+
+newsletter-output/

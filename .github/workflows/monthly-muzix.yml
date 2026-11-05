@@ -1,0 +1,49 @@
+name: Monthly Muzix snapshot
+on:
+  schedule:
+    # First of each month, 08:30 India Standard Time (03:00 UTC).
+    - cron: '0 3 1 * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preview artifact, Resend draft, or send to confirmed Muzix subscribers
+        type: choice
+        options: [preview, draft, send]
+        default: preview
+      month:
+        description: Completed month YYYY-MM; leave empty for previous calendar month
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: muzix-monthly-newsletter
+  cancel-in-progress: false
+jobs:
+  newsletter:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify newsletter behavior
+        run: node --test newsletter/newsletter.test.mjs
+      - name: Build previous month and deliver
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_USERNAME: avrxt
+          MUZIX_RESEND_API_KEY: ${{ secrets.MUZIX_RESEND_API_KEY }}
+          MUZIX_SEGMENT_ID: ${{ vars.MUZIX_SEGMENT_ID }}
+          NEWSLETTER_MODE: ${{ github.event_name == 'schedule' && 'send' || inputs.mode }}
+          NEWSLETTER_MONTH: ${{ inputs.month }}
+        run: node newsletter/monthly.mjs
+      - name: Save newsletter preview and public listening snapshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: muzix-monthly-${{ github.run_id }}
+          path: newsletter-output/
+          if-no-files-found: ignore
+          retention-days: 90
